@@ -335,7 +335,7 @@
     <div class="topbtns">
       <button class="iconbtn" id="themeBtn" title="الوضع الداكن">🌙</button>
       <button class="iconbtn" id="fontBtn" title="حجم الخط">🅰</button>
-      <button class="iconbtn" id="gearBtn" title="إعدادات المكتب">⚙</button>
+      <button class="iconbtn" id="gearBtn" title="دخول المختار">👤</button>
     </div>
     <div class="brand">
       <svg class="seal" viewBox="0 0 200 200" aria-hidden="true">
@@ -365,7 +365,6 @@
       <button class="abtn pub" id="publishBtn">🌐 نشر الموقع</button>
       <button class="abtn" id="exportBtn">⬇ باك أب</button>
       <button class="abtn" id="importBtn">⬆ استيراد</button>
-      <button class="abtn" id="pinBtn">🔑 الرمز</button>
       <button class="abtn" id="resetBtn">↺ استرجاع</button>
       <span class="lbl">وضع المختار</span>
       <button class="abtn exit" id="exitAdminBtn">إنهاء</button>
@@ -819,28 +818,15 @@ function tsText(ts){ try{ if(ts&&ts.toDate) return ts.toDate().toLocaleString("a
 function openDashboard(){
   setHead("📊","الطلبات والمواعيد","لوحة المختار");
   if(!db){ shBody.innerHTML=`<div class="fb-badge off">● غير متصل بـ Firebase</div><p style="color:var(--ink-soft)">ما قدرنا نتصل بقاعدة البيانات. تأكد من الإنترنت وأعد المحاولة.</p>`; openSheet(); return; }
-  if(!auth||!auth.currentUser){ renderLogin(); openSheet(); return; }
+  if(!auth||!auth.currentUser){ openAdminLogin(()=>openDashboard()); return; }
   renderDash(); openSheet();
-}
-function renderLogin(msg){
-  detachDash();
-  shBody.innerHTML=`
-    <div class="fb-badge on">● متصل بـ Firebase</div>
-    <p style="color:var(--ink-soft);font-size:13.5px;margin-top:0">سجّل دخول بحساب المختار لعرض الطلبات (محميّة بالكامل — ما حدا غيرك بيشوفها).</p>
-    <div class="form-row"><label>البريد الإلكتروني</label><input id="lgEmail" type="email" inputmode="email" placeholder="admin@example.com"></div>
-    <div class="form-row"><label>كلمة السر</label><input id="lgPass" type="password" placeholder="••••••••"></div>
-    ${msg?`<p style="color:var(--danger);font-size:13px">${escapeHtml(msg)}</p>`:''}
-    <button class="act on" id="lgBtn" style="width:100%;justify-content:center;padding:13px;font-size:15px">🔓 دخول</button>
-    <p class="auth-note">أنشئ حساب المختار مرة واحدة من Firebase Console ← Authentication ← Users.</p>`;
-  const btn=document.getElementById("lgBtn");
-  btn.addEventListener("click",async ()=>{ const em=val("lgEmail"), pw=document.getElementById("lgPass").value; if(!em||!pw){ alert("أدخل البريد وكلمة السر."); return; } btn.disabled=true; btn.textContent="⏳..."; try{ await auth.signInWithEmailAndPassword(em,pw); renderDash(); }catch(e){ renderLogin("فشل الدخول — تأكد من البريد وكلمة السر."); } });
 }
 function renderDash(){
   shBody.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="fb-badge on" style="margin:0">● ${escapeHtml((auth.currentUser&&auth.currentUser.email)||'المختار')}</span><button class="signout" id="soBtn">تسجيل خروج</button></div>
     <div class="tabs"><button class="tab" id="tabAp">📅 المواعيد <span class="badge" id="cntAp">0</span></button><button class="tab" id="tabCm">📝 الشكاوى <span class="badge" id="cntCm">0</span></button></div>
     <div id="dashList"></div>`;
-  document.getElementById("soBtn").addEventListener("click",async ()=>{ detachDash(); try{ await auth.signOut(); }catch(e){} renderLogin(); });
+  document.getElementById("soBtn").addEventListener("click",async ()=>{ detachDash(); try{ await auth.signOut(); }catch(e){} leaveAdmin(); closeSheet(); });
   document.getElementById("tabAp").addEventListener("click",()=>{ dashTab="appointments"; switchTab(); });
   document.getElementById("tabCm").addEventListener("click",()=>{ dashTab="complaints"; switchTab(); });
   switchTab();
@@ -1098,12 +1084,40 @@ document.getElementById("publishBtn").addEventListener("click", async ()=>{
 document.getElementById("exportBtn").addEventListener("click",()=>{ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([JSON.stringify(DATA,null,2)],{type:"application/json"})); a.download="daleel-mukhtar-backup.json"; a.click(); });
 document.getElementById("importBtn").addEventListener("click",()=>document.getElementById("importFile").click());
 document.getElementById("importFile").addEventListener("change",function(){ const file=this.files[0]; if(!file) return; const r=new FileReader(); r.onload=()=>{ try{ DATA=normalizeData(JSON.parse(r.result)); if(saveData()){ applyHeader(); renderBoard(); setupPWA(); alert("تم الاستيراد ✅"); } }catch(e){ alert("الملف غير صالح."); } }; r.readAsText(file); this.value=""; });
-document.getElementById("pinBtn").addEventListener("click",()=>{ const p=prompt("الرمز الجديد (أرقام):"); if(p===null) return; if(p.trim().length<3){ alert("٣ خانات على الأقل."); return; } setPin(p.trim()); alert("تم تغيير الرمز."); });
 document.getElementById("resetBtn").addEventListener("click",()=>{ if(confirm("استرجاع البيانات الافتراضية؟ سيُمسح أي تعديل.")){ DATA=normalizeData(DEFAULT_DATA); if(saveData()){ applyHeader(); renderBoard(); setupPWA(); } } });
 
-/* ===== دخول/خروج وضع المختار ===== */
-document.getElementById("gearBtn").addEventListener("click",()=>{ if(document.body.classList.contains("admin")) return; const p=prompt("الرمز السري لدخول وضع المختار:"); if(p===null) return; if(p===getPin()){ document.body.classList.add("admin"); renderBoard(val("searchInput")); } else alert("الرمز غير صحيح."); });
-document.getElementById("exitAdminBtn").addEventListener("click",()=>{ document.body.classList.remove("admin"); renderBoard(val("searchInput")); });
+/* ===== دخول/خروج وضع المختار (تسجيل دخول موحّد بحساب Firebase) ===== */
+function enterAdmin(){ document.body.classList.add("admin"); renderBoard(val("searchInput")); }
+function leaveAdmin(){ document.body.classList.remove("admin"); renderBoard(val("searchInput")); }
+document.getElementById("gearBtn").addEventListener("click",()=>{
+  if(document.body.classList.contains("admin")) return;
+  if(auth&&auth.currentUser){ enterAdmin(); return; }
+  openAdminLogin();
+});
+function openAdminLogin(afterLogin){
+  setHead("👤","دخول المختار","سجّل دخول لإدارة الموقع والطلبات");
+  if(!db||!auth){ shBody.innerHTML=`<div class="fb-badge off">● غير متصل</div><p style="color:var(--ink-soft)">الدخول بدّو إنترنت واتصال بقاعدة البيانات. تأكد إنك فاتح الموقع أونلاين وأعد المحاولة.</p>`; openSheet(); return; }
+  shBody.innerHTML=`
+    <div class="form-row"><label>البريد الإلكتروني</label><input id="lgEmail" type="email" inputmode="email" autocomplete="username" placeholder="example@gmail.com"></div>
+    <div class="form-row"><label>كلمة السر</label><input id="lgPass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <p id="lgErr" style="color:var(--danger);font-size:13px;display:none"></p>
+    <button class="act on" id="lgBtn" style="width:100%;justify-content:center;padding:13px;font-size:15px">🔓 دخول</button>
+    <p class="auth-note">دخول واحد بيفتحلك كل شي: تعديل الموقع + المواعيد والشكاوى. بيضل محفوظ ع هالجهاز.</p>`;
+  openSheet();
+  const btn=document.getElementById("lgBtn"), err=document.getElementById("lgErr"), pw=document.getElementById("lgPass");
+  async function doLogin(){
+    const em=val("lgEmail"), p=pw.value;
+    if(!em||!p){ err.textContent="أدخل البريد وكلمة السر."; err.style.display="block"; return; }
+    btn.disabled=true; btn.textContent="⏳ عم يتحقّق...";
+    try{ await auth.signInWithEmailAndPassword(em,p); enterAdmin(); if(typeof afterLogin==="function"){ afterLogin(); } else { closeSheet(); } }
+    catch(e){ btn.disabled=false; btn.textContent="🔓 دخول"; err.textContent="فشل الدخول — تأكد من البريد وكلمة السر."; err.style.display="block"; }
+  }
+  btn.addEventListener("click",doLogin);
+  pw.addEventListener("keydown",e=>{ if(e.key==="Enter") doLogin(); });
+}
+document.getElementById("exitAdminBtn").addEventListener("click",async ()=>{ leaveAdmin(); detachDash(); if(auth&&auth.currentUser){ try{ await auth.signOut(); }catch(e){} } });
+/* استرجاع الجلسة تلقائياً: إذا كان مسجّل دخول من قبل، وضع المختار بيرجع لحالو */
+if(auth){ auth.onAuthStateChanged(u=>{ if(u){ enterAdmin(); } }); }
 
 /* ===== أزرار الأدوات ===== */
 document.getElementById("finderBtn").addEventListener("click",openFinder);
