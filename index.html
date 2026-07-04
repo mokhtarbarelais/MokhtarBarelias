@@ -819,7 +819,7 @@ function openDashboard(){
   setHead("📊","الطلبات والمواعيد","لوحة المختار");
   if(!db){ shBody.innerHTML=`<div class="fb-badge off">● غير متصل بـ Firebase</div><p style="color:var(--ink-soft)">ما قدرنا نتصل بقاعدة البيانات. تأكد من الإنترنت وأعد المحاولة.</p>`; openSheet(); return; }
   if(!auth||!auth.currentUser){ openAdminLogin(()=>openDashboard()); return; }
-  renderDash(); openSheet();
+  openSheet(); renderDash();
 }
 function renderDash(){
   shBody.innerHTML=`
@@ -841,14 +841,23 @@ function listenColl(coll){
   detachDash();
   const list=document.getElementById("dashList"); if(!list) return;
   list.innerHTML=`<div class="empty-dash"><span class="e">⏳</span>عم نحمّل...</div>`;
-  dashUnsub=db.collection(coll).orderBy("createdAt","desc").onSnapshot((snap)=>{
-    const cntEl=document.getElementById(coll==="appointments"?"cntAp":"cntCm"); if(cntEl) cntEl.textContent=snap.size;
-    if(snap.empty){ list.innerHTML=`<div class="empty-dash"><span class="e">📭</span>ما في ${coll==="appointments"?"مواعيد":"شكاوى"} بعد.</div>`; return; }
-    let html=""; snap.forEach(doc=>{ html+=renderReq(coll,doc.id,doc.data()); });
-    list.innerHTML=html;
-    list.querySelectorAll("[data-st]").forEach(sel=>sel.addEventListener("change",()=>{ sel.className="stsel "+statusClass(sel.value); db.collection(coll).doc(sel.dataset.st).update({status:sel.value}).catch(()=>alert("تعذّر التحديث.")); }));
-    list.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{ if(confirm("حذف هذا الطلب نهائياً؟")) db.collection(coll).doc(b.dataset.del).delete().catch(()=>alert("تعذّر الحذف.")); }));
-  },()=>{ list.innerHTML=`<div class="empty-dash"><span class="e">⚠️</span>تعذّر تحميل البيانات.<br><span style="font-size:12px">تأكد من نشر قواعد الأمان (Rules).</span></div>`; });
+  try{
+    dashUnsub=db.collection(coll).orderBy("createdAt","desc").onSnapshot((snap)=>{
+      const cntEl=document.getElementById(coll==="appointments"?"cntAp":"cntCm"); if(cntEl) cntEl.textContent=snap.size;
+      if(snap.empty){ list.innerHTML=`<div class="empty-dash"><span class="e">📭</span>ما في ${coll==="appointments"?"مواعيد":"شكاوى"} بعد.</div>`; return; }
+      let html=""; snap.forEach(doc=>{ html+=renderReq(coll,doc.id,doc.data()); });
+      list.innerHTML=html;
+      list.querySelectorAll("[data-st]").forEach(sel=>sel.addEventListener("change",()=>{ sel.className="stsel "+statusClass(sel.value); db.collection(coll).doc(sel.dataset.st).update({status:sel.value}).catch(()=>alert("تعذّر التحديث.")); }));
+      list.querySelectorAll("[data-del]").forEach(b=>b.addEventListener("click",()=>{ if(confirm("حذف هذا الطلب نهائياً؟")) db.collection(coll).doc(b.dataset.del).delete().catch(()=>alert("تعذّر الحذف.")); }));
+    },(err)=>{
+      const code=(err&&err.code)||"unknown";
+      let hint="تأكد من الإنترنت وأعد المحاولة.";
+      if(code==="permission-denied") hint="قواعد الأمان رفضت القراءة — تأكد إن بريد الدخول هو نفسه المكتوب في الـ Rules.";
+      list.innerHTML=`<div class="empty-dash"><span class="e">⚠️</span>تعذّر تحميل البيانات.<br><span style="font-size:12px">${escapeHtml(hint)}</span><br><span style="font-size:11px;color:var(--ink-soft)">(${escapeHtml(code)})</span></div>`;
+    });
+  }catch(e){
+    list.innerHTML=`<div class="empty-dash"><span class="e">⚠️</span>صار خطأ غير متوقع.<br><span style="font-size:11px">${escapeHtml(String(e&&e.message||e))}</span></div>`;
+  }
 }
 function renderReq(coll,id,d){
   const st=d.status||"جديد", cls=statusClass(st);
@@ -1120,6 +1129,7 @@ document.getElementById("exitAdminBtn").addEventListener("click",async ()=>{ lea
 if(auth){ auth.onAuthStateChanged(u=>{ if(u){ enterAdmin(); } }); }
 
 /* ===== أزرار الأدوات ===== */
+document.getElementById("addSvcBtn").addEventListener("click",()=>openAddService());
 document.getElementById("finderBtn").addEventListener("click",openFinder);
 document.getElementById("bookBtn").addEventListener("click",openBooking);
 document.getElementById("calcBtn").addEventListener("click",openCalc);
