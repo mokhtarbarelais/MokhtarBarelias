@@ -381,6 +381,7 @@
   <div class="tools">
     <button class="tool hl" id="finderBtn">🧭 شو وضعك؟</button>
     <button class="tool" id="bookBtn">📅 احجز موعد</button>
+    <button class="tool" id="trackBtn">🔎 تتبّع طلبك</button>
     <button class="tool" id="calcBtn">💰 حاسبة الرسوم</button>
     <button class="tool" id="deadlineBtn">⏰ احسب مهلتك</button>
     <button class="tool" id="shareBtn">↗️ شارك / QR</button>
@@ -393,7 +394,7 @@
     <p id="footHours"></p>
     <p id="footUpdated"></p>
     <p id="footNote"></p>
-    <p style="opacity:.55;font-size:11px">الإصدار 5.1</p>
+    <p style="opacity:.55;font-size:11px">الإصدار 5.2</p>
   </footer>
 </div>
 
@@ -592,7 +593,7 @@ let db=null, auth=null;
     try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
   }catch(e){ db=null; auth=null; }
 })();
-async function fbAdd(coll,data){ if(!db) return false; try{ await db.collection(coll).add(Object.assign({},data,{createdAt:firebase.firestore.FieldValue.serverTimestamp()})); return true; }catch(e){ return false; } }
+async function fbAdd(coll,data){ if(!db) return null; try{ const ref=await db.collection(coll).add(Object.assign({},data,{createdAt:firebase.firestore.FieldValue.serverTimestamp()})); return ref.id; }catch(e){ return null; } }
 
 /* ===== كاشف أخطاء (مؤقت للتشخيص): يعرض أي خطأ JS على الشاشة ===== */
 function showErrToast(msg){
@@ -799,10 +800,75 @@ function openComplaint(){
   openSheet();
   function collect(){ const subj=val("cSubj"),det=val("cDet"); if(!subj&&!det){ alert("اكتب الموضوع أو التفاصيل ع الأقل."); return null; } return {type:val("cType"),name:val("cName"),phone:val("cPhone"),subject:subj,details:det}; }
   const sv=document.getElementById("cSave");
-  if(sv) sv.addEventListener("click",async ()=>{ const c=collect(); if(!c) return; sv.disabled=true; sv.textContent="⏳ عم يُرسل..."; const ok=await fbAdd("complaints",{type:c.type,name:c.name||"",phone:c.phone||"",subject:c.subject||"",details:c.details||"",status:"جديد"}); if(ok){ shBody.innerHTML=`<div class="empty-dash"><span class="e">✅</span><b>تم استلام طلبك</b><p>رح يطّلع عليه المختار قريباً. بتقدر تبعت نسخة عبر واتساب كمان.</p><button class="act wa" id="cWaAfter" style="justify-content:center;margin-top:6px">📲 نسخة عبر واتساب</button></div>`; const wb=document.getElementById("cWaAfter"); if(wb) wb.addEventListener("click",()=>openWhatsApp(cmpMsg(c))); } else { sv.disabled=false; sv.textContent="✅ إرسال الطلب"; alert("تعذّر الإرسال (تحقّق من الإنترنت). جرّب واتساب."); } });
+  if(sv) sv.addEventListener("click",async ()=>{ const c=collect(); if(!c) return; sv.disabled=true; sv.textContent="⏳ عم يُرسل..."; const newId=await fbAdd("complaints",{type:c.type,name:c.name||"",phone:c.phone||"",subject:c.subject||"",details:c.details||"",status:"جديد"}); if(newId){ successWithTrack("تم استلام طلبك","رح يطّلع عليه المختار قريباً.","complaints",newId,cmpMsg(c)); } else { sv.disabled=false; sv.textContent="✅ إرسال الطلب"; alert("تعذّر الإرسال (تحقّق من الإنترنت). جرّب واتساب."); } });
   document.getElementById("cSend").addEventListener("click",()=>{ const c=collect(); if(!c) return; openWhatsApp(cmpMsg(c)); if(!db) closeSheet(); });
 }
 function cmpMsg(c){ return "*"+c.type+"*\n———\nالاسم: "+(c.name||"-")+"\nالهاتف: "+(c.phone||"-")+"\nالموضوع: "+(c.subject||"-")+"\n\n"+c.details; }
+
+/* ===== شاشة نجاح + رقم المتابعة ===== */
+const LS_TRACK="mukhtar_my_tracks";
+function rememberTrack(coll,id,label){ try{ const arr=JSON.parse(localStorage.getItem(LS_TRACK)||"[]"); arr.unshift({coll,id,label,at:Date.now()}); localStorage.setItem(LS_TRACK, JSON.stringify(arr.slice(0,10))); }catch(e){} }
+function successWithTrack(title, sub, coll, id, waText){
+  rememberTrack(coll, id, sub);
+  shBody.innerHTML=`<div class="empty-dash"><span class="e">✅</span><b>${escapeHtml(title)}</b>
+    <p style="margin:6px 0 12px">${escapeHtml(sub)}</p>
+    <div style="background:var(--card);border:1.5px dashed var(--line-strong);border-radius:12px;padding:12px;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px">رقم المتابعة — احتفظ فيه لتتبّع طلبك</div>
+      <div style="font-family:monospace;font-weight:800;font-size:15px;direction:ltr;word-break:break-all;color:var(--cedar-deep)" id="trkCode">${escapeHtml(id)}</div>
+    </div>
+    <div class="act-row" style="justify-content:center">
+      <button class="act on" id="trkCopy">📋 نسخ الرقم</button>
+      <button class="act" id="trkNow">🔎 تتبّع الآن</button>
+      <button class="act wa" id="trkWa">📲 نسخة واتساب</button>
+    </div></div>`;
+  document.getElementById("trkCopy").addEventListener("click",function(){ if(navigator.clipboard){ navigator.clipboard.writeText(id).then(()=>{ this.textContent="✅ انتسخ"; }); } else prompt("انسخ الرقم:",id); });
+  document.getElementById("trkNow").addEventListener("click",()=>openTrack(id));
+  document.getElementById("trkWa").addEventListener("click",()=>openWhatsApp(waText+"\n\n🔎 رقم المتابعة: "+id));
+}
+
+/* ===== 🔎 تتبّع طلبك (للمواطن — بدون حساب) ===== */
+async function fetchTrack(id){
+  if(!db) return {err:"offline"};
+  for(const coll of ["appointments","complaints"]){
+    try{ const doc=await db.collection(coll).doc(id).get(); if(doc.exists) return {coll, d:doc.data()}; }
+    catch(e){ if(e&&e.code==="permission-denied") return {err:"rules"}; }
+  }
+  return {err:"notfound"};
+}
+function trackCardHTML(coll,d){
+  const st=d.status||"جديد", cls=statusClass(st);
+  const icon= st==="منجز"?"🟢": (st==="قيد المعالجة"?"🔵":"🟡");
+  let inner="";
+  if(coll==="appointments"){ inner=`<div class="line"><b>المعاملة:</b> ${escapeHtml(d.service||"-")}</div><div class="line"><b>التاريخ:</b> ${escapeHtml(d.date||"-")} ${d.time?("• "+escapeHtml(d.time)):""}</div>`; }
+  else { inner=`<div class="line"><b>النوع:</b> ${escapeHtml(d.type||"-")}</div><div class="line"><b>الموضوع:</b> ${escapeHtml(d.subject||"-")}</div>`; }
+  return `<div class="req ${cls}"><h4>${coll==="appointments"?"📅 موعد":"📝 طلب"}</h4><div class="when">قُدّم: ${tsText(d.createdAt)}</div>${inner}
+    <div style="margin-top:10px;padding:10px 12px;border-radius:10px;font-weight:800;text-align:center" class="stsel ${cls}">${icon} الحالة: ${escapeHtml(st)}</div></div>`;
+}
+async function openTrack(prefill){
+  closeChat(); setHead("🔎","تتبّع طلبك","حط رقم المتابعة وشوف حالة معاملتك");
+  let mine=[]; try{ mine=JSON.parse(localStorage.getItem(LS_TRACK)||"[]"); }catch(e){}
+  const mineHtml = mine.length? `<div class="blk-title">طلباتك من هذا الجهاز</div><div class="big-opts" style="margin-bottom:14px">${mine.map((m,i)=>`<button class="big-opt" data-mine="${i}" style="font-size:13.5px;padding:11px 14px"><span class="e">🎫</span><span style="direction:ltr;font-family:monospace;font-size:12px">${escapeHtml(m.id.slice(0,10))}…</span></button>`).join("")}</div>`:"";
+  shBody.innerHTML=`
+    <div class="form-row"><label>رقم المتابعة</label><input id="trkIn" style="direction:ltr;font-family:monospace" placeholder="مثال: aB3xY9..." value="${escAttr(prefill||"")}"></div>
+    <button class="act on" id="trkGo" style="width:100%;justify-content:center;padding:13px;font-size:15px">🔎 اعرض الحالة</button>
+    <div id="trkRes" style="margin-top:14px"></div>
+    ${mineHtml}`;
+  openSheet();
+  const res=document.getElementById("trkRes");
+  async function go(id){
+    if(!id){ alert("حط رقم المتابعة."); return; }
+    res.innerHTML=`<div class="empty-dash"><span class="e">⏳</span>عم نبحث...</div>`;
+    const r=await fetchTrack(id.trim());
+    if(r.err==="offline"){ res.innerHTML=`<div class="empty-dash"><span class="e">📡</span>ما في اتصال بقاعدة البيانات. تأكد من الإنترنت.</div>`; return; }
+    if(r.err==="rules"){ res.innerHTML=`<div class="empty-dash"><span class="e">⚠️</span>التتبّع مش مفعّل بعد — لازم المختار يحدّث قواعد الأمان.</div>`; return; }
+    if(r.err==="notfound"){ res.innerHTML=`<div class="empty-dash"><span class="e">🤔</span>ما لقينا طلب بهالرقم. تأكد من الرقم كامل.</div>`; return; }
+    res.innerHTML=trackCardHTML(r.coll, r.d);
+  }
+  document.getElementById("trkGo").addEventListener("click",()=>go(val("trkIn")));
+  document.getElementById("trkIn").addEventListener("keydown",e=>{ if(e.key==="Enter") go(val("trkIn")); });
+  shBody.querySelectorAll("[data-mine]").forEach(b=>b.addEventListener("click",()=>{ const m=mine[+b.dataset.mine]; document.getElementById("trkIn").value=m.id; go(m.id); }));
+  if(prefill) go(prefill);
+}
 
 /* ===== حجز موعد ===== */
 function bookMsg(b){ return "*طلب موعد*\n———\nالمعاملة: "+b.service+"\nالتاريخ: "+(b.date||"-")+"\nالوقت: "+(b.time||"-")+"\nالاسم: "+(b.name||"-")+"\nالهاتف: "+(b.phone||"-")+(b.note?("\nملاحظة: "+b.note):""); }
@@ -821,7 +887,7 @@ function openBooking(){
   openSheet();
   function collect(){ const service=val("bSvc"), date=val("bDate"), phone=val("bPhone"), name=val("bName"); if(!date){ alert("اختر تاريخ الموعد."); return null; } if(!name&&!phone){ alert("اكتب اسمك أو رقمك ليتم التأكيد."); return null; } return {service,date,time:val("bTime"),name,phone,note:val("bNote")}; }
   const sb=document.getElementById("bSave");
-  if(sb) sb.addEventListener("click",async ()=>{ const b=collect(); if(!b) return; sb.disabled=true; sb.textContent="⏳ عم يُحجز..."; const ok=await fbAdd("appointments",{service:b.service,date:b.date,time:b.time||"",name:b.name||"",phone:b.phone||"",note:b.note||"",status:"جديد"}); if(ok){ shBody.innerHTML=`<div class="empty-dash"><span class="e">✅</span><b>تم تسجيل طلب موعدك</b><p>رح يأكّدلك المختار الموعد. فيك تبعت نسخة عبر واتساب كمان.</p><button class="act wa" id="bWaAfter" style="justify-content:center;margin-top:6px">📲 نسخة عبر واتساب</button></div>`; const wb=document.getElementById("bWaAfter"); if(wb) wb.addEventListener("click",()=>openWhatsApp(bookMsg(b))); } else { sb.disabled=false; sb.textContent="✅ احجز الموعد"; alert("تعذّر الحجز (تحقّق من الإنترنت). جرّب واتساب."); } });
+  if(sb) sb.addEventListener("click",async ()=>{ const b=collect(); if(!b) return; sb.disabled=true; sb.textContent="⏳ عم يُحجز..."; const newId=await fbAdd("appointments",{service:b.service,date:b.date,time:b.time||"",name:b.name||"",phone:b.phone||"",note:b.note||"",status:"جديد"}); if(newId){ successWithTrack("تم تسجيل طلب موعدك","رح يأكّدلك المختار الموعد.","appointments",newId,bookMsg(b)); } else { sb.disabled=false; sb.textContent="✅ احجز الموعد"; alert("تعذّر الحجز (تحقّق من الإنترنت). جرّب واتساب."); } });
   document.getElementById("bWa").addEventListener("click",()=>{ const b=collect(); if(!b) return; openWhatsApp(bookMsg(b)); if(!db) closeSheet(); });
 }
 
@@ -1148,6 +1214,7 @@ if(auth){ auth.onAuthStateChanged(u=>{ if(u){ enterAdmin(); } }); }
 document.getElementById("addSvcBtn").addEventListener("click",()=>openAddService());
 document.getElementById("finderBtn").addEventListener("click",openFinder);
 document.getElementById("bookBtn").addEventListener("click",openBooking);
+document.getElementById("trackBtn").addEventListener("click",()=>openTrack());
 document.getElementById("calcBtn").addEventListener("click",openCalc);
 document.getElementById("deadlineBtn").addEventListener("click",openDeadline);
 document.getElementById("shareBtn").addEventListener("click",openShare);
