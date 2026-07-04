@@ -101,8 +101,8 @@
 
   .overlay{position:fixed;inset:0;background:rgba(13,30,20,.55);backdrop-filter:blur(3px);z-index:80;display:none;opacity:0;transition:opacity .2s}
   .overlay.show{display:block;opacity:1}
-  .sheet{position:fixed;z-index:85;left:50%;bottom:0;transform:translateX(-50%) translateY(100%);width:100%;max-width:680px;background:var(--paper);border-radius:22px 22px 0 0;box-shadow:0 -12px 40px -10px rgba(13,58,32,.4);max-height:92vh;overflow:hidden;transition:transform .26s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
-  .sheet.show{transform:translateX(-50%) translateY(0)}
+  .sheet{position:fixed;z-index:85;left:50%;bottom:0;transform:translateX(-50%) translateY(100%);width:100%;max-width:680px;background:var(--paper);border-radius:22px 22px 0 0;box-shadow:0 -12px 40px -10px rgba(13,58,32,.4);max-height:92vh;overflow:hidden;transition:transform .26s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;pointer-events:none}
+  .sheet.show{transform:translateX(-50%) translateY(0);pointer-events:auto}
   @media(min-width:680px){.sheet{bottom:auto;top:50%;transform:translateX(-50%) translateY(-46%) scale(.98);border-radius:22px;opacity:0}.sheet.show{transform:translateX(-50%) translateY(-50%) scale(1);opacity:1}}
   .sheet-grip{width:44px;height:5px;border-radius:99px;background:var(--line-strong);margin:10px auto 4px}
   @media(min-width:680px){.sheet-grip{display:none}}
@@ -171,8 +171,8 @@
   .fab{position:fixed;left:16px;bottom:18px;z-index:40;height:56px;padding:0 20px 0 18px;border-radius:999px;background:linear-gradient(135deg,var(--cedar),var(--cedar-2));color:#fff;border:none;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:inherit;font-weight:700;font-size:15px;box-shadow:0 14px 30px -10px rgba(13,58,32,.6)}
   .fab .ring{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:15px}
   body.chat-open .fab{display:none}
-  .chat{position:fixed;z-index:70;left:0;right:0;bottom:0;height:min(86vh,640px);background:var(--paper);border-radius:22px 22px 0 0;box-shadow:0 -16px 50px -12px rgba(13,58,32,.5);display:flex;flex-direction:column;transform:translateY(110%);transition:transform .3s cubic-bezier(.2,.8,.2,1)}
-  body.chat-open .chat{transform:translateY(0)}
+  .chat{position:fixed;z-index:70;left:0;right:0;bottom:0;height:min(86vh,640px);background:var(--paper);border-radius:22px 22px 0 0;box-shadow:0 -16px 50px -12px rgba(13,58,32,.5);display:flex;flex-direction:column;transform:translateY(110%);transition:transform .3s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+  body.chat-open .chat{transform:translateY(0);pointer-events:auto}
   @media(min-width:680px){.chat{left:auto;right:24px;width:400px;border-radius:22px;bottom:24px}}
   .chat-head{display:flex;align-items:center;gap:12px;padding:16px 18px;background:linear-gradient(135deg,var(--cedar-deep),var(--cedar));color:#fff;border-radius:22px 22px 0 0}
   .chat-head .av{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);display:grid;place-items:center;font-size:20px}
@@ -393,6 +393,7 @@
     <p id="footHours"></p>
     <p id="footUpdated"></p>
     <p id="footNote"></p>
+    <p style="opacity:.55;font-size:11px">الإصدار 5.1</p>
   </footer>
 </div>
 
