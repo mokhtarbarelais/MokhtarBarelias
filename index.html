@@ -593,6 +593,21 @@ let db=null, auth=null;
 })();
 async function fbAdd(coll,data){ if(!db) return false; try{ await db.collection(coll).add(Object.assign({},data,{createdAt:firebase.firestore.FieldValue.serverTimestamp()})); return true; }catch(e){ return false; } }
 
+/* ===== كاشف أخطاء (مؤقت للتشخيص): يعرض أي خطأ JS على الشاشة ===== */
+function showErrToast(msg){
+  try{
+    let t=document.getElementById("errToast");
+    if(!t){ t=document.createElement("div"); t.id="errToast";
+      t.style.cssText="position:fixed;top:10px;left:10px;right:10px;z-index:9999;background:#8F2A2A;color:#fff;padding:10px 14px;border-radius:10px;font-size:12px;font-family:monospace;direction:ltr;text-align:left;word-break:break-all;box-shadow:0 8px 20px rgba(0,0,0,.4)";
+      t.addEventListener("click",()=>t.remove());
+      document.body.appendChild(t);
+    }
+    t.textContent="⚠ "+msg+"  (اضغط للإغلاق)";
+  }catch(e){}
+}
+window.addEventListener("error",(e)=>{ showErrToast((e.message||"error")+" @ "+(e.filename||"").split("/").pop()+":"+(e.lineno||"?")); });
+window.addEventListener("unhandledrejection",(e)=>{ const r=e.reason; showErrToast("Promise: "+(r&&(r.message||r.code)||String(r))); });
+
 /* ===== أدوات ===== */
 function norm(s){ return (s||"").replace(/[\u064B-\u0652\u0670\u0640]/g,"").replace(/[إأآا]/g,"ا").replace(/ى/g,"ي").replace(/ة/g,"ه").replace(/ؤ/g,"و").replace(/ئ/g,"ي").replace(/[^\u0600-\u06FF0-9a-zA-Z\s]/g," ").replace(/\s+/g," ").trim().toLowerCase(); }
 function escapeHtml(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
