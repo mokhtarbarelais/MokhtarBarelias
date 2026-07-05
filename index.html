@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>دليل المواطن — مكتب المختار فاروق عبد الكريم الميس</title>
+<title>دليل المواطن — مكتب المختار</title>
 <meta name="theme-color" content="#15532E">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -394,7 +394,7 @@
     <p id="footHours"></p>
     <p id="footUpdated"></p>
     <p id="footNote"></p>
-    <p style="opacity:.55;font-size:11px">الإصدار 5.2</p>
+    <p style="opacity:.55;font-size:11px">الإصدار 5.3</p>
   </footer>
 </div>
 
@@ -593,7 +593,16 @@ let db=null, auth=null;
     try{ db.enablePersistence({synchronizeTabs:true}).catch(()=>{}); }catch(e){}
   }catch(e){ db=null; auth=null; }
 })();
-async function fbAdd(coll,data){ if(!db) return null; try{ const ref=await db.collection(coll).add(Object.assign({},data,{createdAt:firebase.firestore.FieldValue.serverTimestamp()})); return ref.id; }catch(e){ return null; } }
+async function fbAdd(coll,data){
+  if(!db) return null;
+  /* بدون نت: منرفض بوضوح بدل ما ينبعت الطلب بصمت لاحقاً */
+  if(navigator.onLine===false) return "OFFLINE";
+  try{
+    const p=db.collection(coll).add(Object.assign({},data,{createdAt:firebase.firestore.FieldValue.serverTimestamp()}));
+    const ref=await Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),12000))]);
+    return ref.id;
+  }catch(e){ return null; }
+}
 
 /* ===== كاشف أخطاء (مؤقت للتشخيص): يعرض أي خطأ JS على الشاشة ===== */
 function showErrToast(msg){
@@ -800,7 +809,7 @@ function openComplaint(){
   openSheet();
   function collect(){ const subj=val("cSubj"),det=val("cDet"); if(!subj&&!det){ alert("اكتب الموضوع أو التفاصيل ع الأقل."); return null; } return {type:val("cType"),name:val("cName"),phone:val("cPhone"),subject:subj,details:det}; }
   const sv=document.getElementById("cSave");
-  if(sv) sv.addEventListener("click",async ()=>{ const c=collect(); if(!c) return; sv.disabled=true; sv.textContent="⏳ عم يُرسل..."; const newId=await fbAdd("complaints",{type:c.type,name:c.name||"",phone:c.phone||"",subject:c.subject||"",details:c.details||"",status:"جديد"}); if(newId){ successWithTrack("تم استلام طلبك","رح يطّلع عليه المختار قريباً.","complaints",newId,cmpMsg(c)); } else { sv.disabled=false; sv.textContent="✅ إرسال الطلب"; alert("تعذّر الإرسال (تحقّق من الإنترنت). جرّب واتساب."); } });
+  if(sv) sv.addEventListener("click",async ()=>{ const c=collect(); if(!c) return; sv.disabled=true; sv.textContent="⏳ عم يُرسل..."; const newId=await fbAdd("complaints",{type:c.type,name:c.name||"",phone:c.phone||"",subject:c.subject||"",details:c.details||"",status:"جديد"}); if(newId==="OFFLINE"){ sv.disabled=false; sv.textContent="✅ إرسال الطلب"; alert("📡 ما في إنترنت حالياً — طلبك ما انبعت.\nشبّك النت واضغط إرسال من جديد، أو ابعتو عبر واتساب."); } else if(newId){ successWithTrack("تم استلام طلبك","رح يطّلع عليه المختار قريباً.","complaints",newId,cmpMsg(c)); } else { sv.disabled=false; sv.textContent="✅ إرسال الطلب"; alert("تعذّر الإرسال (تحقّق من الإنترنت). جرّب واتساب."); } });
   document.getElementById("cSend").addEventListener("click",()=>{ const c=collect(); if(!c) return; openWhatsApp(cmpMsg(c)); if(!db) closeSheet(); });
 }
 function cmpMsg(c){ return "*"+c.type+"*\n———\nالاسم: "+(c.name||"-")+"\nالهاتف: "+(c.phone||"-")+"\nالموضوع: "+(c.subject||"-")+"\n\n"+c.details; }
@@ -887,7 +896,7 @@ function openBooking(){
   openSheet();
   function collect(){ const service=val("bSvc"), date=val("bDate"), phone=val("bPhone"), name=val("bName"); if(!date){ alert("اختر تاريخ الموعد."); return null; } if(!name&&!phone){ alert("اكتب اسمك أو رقمك ليتم التأكيد."); return null; } return {service,date,time:val("bTime"),name,phone,note:val("bNote")}; }
   const sb=document.getElementById("bSave");
-  if(sb) sb.addEventListener("click",async ()=>{ const b=collect(); if(!b) return; sb.disabled=true; sb.textContent="⏳ عم يُحجز..."; const newId=await fbAdd("appointments",{service:b.service,date:b.date,time:b.time||"",name:b.name||"",phone:b.phone||"",note:b.note||"",status:"جديد"}); if(newId){ successWithTrack("تم تسجيل طلب موعدك","رح يأكّدلك المختار الموعد.","appointments",newId,bookMsg(b)); } else { sb.disabled=false; sb.textContent="✅ احجز الموعد"; alert("تعذّر الحجز (تحقّق من الإنترنت). جرّب واتساب."); } });
+  if(sb) sb.addEventListener("click",async ()=>{ const b=collect(); if(!b) return; sb.disabled=true; sb.textContent="⏳ عم يُحجز..."; const newId=await fbAdd("appointments",{service:b.service,date:b.date,time:b.time||"",name:b.name||"",phone:b.phone||"",note:b.note||"",status:"جديد"}); if(newId==="OFFLINE"){ sb.disabled=false; sb.textContent="✅ احجز الموعد"; alert("📡 ما في إنترنت حالياً — طلبك ما انبعت.\nشبّك النت واضغط احجز من جديد، أو ابعتو عبر واتساب."); } else if(newId){ successWithTrack("تم تسجيل طلب موعدك","رح يأكّدلك المختار الموعد.","appointments",newId,bookMsg(b)); } else { sb.disabled=false; sb.textContent="✅ احجز الموعد"; alert("تعذّر الحجز (تحقّق من الإنترنت). جرّب واتساب."); } });
   document.getElementById("bWa").addEventListener("click",()=>{ const b=collect(); if(!b) return; openWhatsApp(bookMsg(b)); if(!db) closeSheet(); });
 }
 
