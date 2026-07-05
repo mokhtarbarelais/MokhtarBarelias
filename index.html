@@ -431,7 +431,7 @@
 /*__SITE_DATA_START__*/
 const DEFAULT_DATA = {
   office:{
-    name:"مكتب المختار", region:"بر الياس — البقاع", phone:"+96170233933", whatsapp:"96170233933",
+    name:"مكتب المختار فاروق عبد الكريم الميس", region:"بر الياس — البقاع", phone:"+96170233933", whatsapp:"96170233933",
     address:"بر الياس — البقاع، لبنان", mapsUrl:"",
     openDays:[1,2,3,4,5], openTime:"08:00", closeTime:"14:00",
     hoursText:"الإثنين – الجمعة: ٨:٠٠ صباحاً – ٢:٠٠ بعد الظهر",
@@ -694,7 +694,7 @@ function applyHeader(){
   const hasWa=!!waDigits(o.whatsapp); document.body.classList.toggle("has-wa",hasWa);
   // status
   const open=officeOpenNow();
-  statusPill.innerHTML = open===null?"":`<span class="status ${open?'open':'closed'}">${open?'🟢 مفتوح الآن':'🔴 مسكّر الآن'}</span>`;
+  statusPill.innerHTML = "";
   // contact
   let h="";
   if(hasWa){ h+=`<button class="cbtn wa" id="cWa">📲 تحدّث مع المختار</button>`; h+=`<button class="cbtn" id="cCmp">📝 شكوى / طلب</button>`; }
@@ -1295,7 +1295,6 @@ chatInput.addEventListener("keydown",e=>{ if(e.key==="Enter") handleSend(); });
   try{ DATA=await loadDataAsync(); }catch(e){ DATA=loadDataSyncFallback(); }
   applyTheme(); applyFont(); applyHeader(); renderBoard(); setupPWA();
 })();
-setInterval(()=>{ const o=officeOpenNow(); if(o!==null){ statusPill.innerHTML=`<span class="status ${o?'open':'closed'}">${o?'🟢 مفتوح الآن':'🔴 مسكّر الآن'}</span>`; } }, 60000);
 </script>
 </body>
 </html>
