@@ -1,7 +1,7 @@
 /* دليل المواطن — Service Worker (اختياري) */
 /* يخلّي التطبيق يفتح حتى بدون إنترنت بعد أول زيارة. */
 /* غيّر رقم النسخة لما تنشر تحديث، حتى يتحدّث الكاش عند الناس. */
-const CACHE = "daleel-mukhtar-v5-3";
+const CACHE = "daleel-mukhtar-v6-0";
 
 const SHELL = [
   "./",

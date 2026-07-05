@@ -6,11 +6,13 @@
 <title>دليل المواطن — مكتب المختار</title>
 <meta name="theme-color" content="#15532E">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="دليل المواطن">
 <meta name="description" content="دليل المواطن للمعاملات الرسمية لدى مكتب المختار — المستندات المطلوبة، المهل القانونية، حجز موعد وتواصل مباشر.">
 <link id="manifestLink" rel="manifest">
 <link id="appleIcon" rel="apple-touch-icon">
+<link id="favIcon" rel="icon" type="image/png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Reem+Kufi:wght@500;600;700&display=swap" rel="stylesheet">
@@ -335,7 +337,7 @@
     <div class="topbtns">
       <button class="iconbtn" id="themeBtn" title="الوضع الداكن">🌙</button>
       <button class="iconbtn" id="fontBtn" title="حجم الخط">🅰</button>
-      <button class="iconbtn" id="gearBtn" title="دخول المختار">👤</button>
+      <button class="iconbtn" id="gearBtn" title="دخول المختار" style="display:none">👤</button>
     </div>
     <div class="brand">
       <svg class="seal" viewBox="0 0 200 200" aria-hidden="true">
@@ -394,7 +396,7 @@
     <p id="footHours"></p>
     <p id="footUpdated"></p>
     <p id="footNote"></p>
-    <p style="opacity:.55;font-size:11px">الإصدار 5.3</p>
+    <p style="opacity:.55;font-size:11px">الإصدار 6.0</p>
   </footer>
 </div>
 
@@ -560,17 +562,52 @@ function idbGet(key){ return idbOpen().then(db=>new Promise((res,rej)=>{ const t
 function idbSet(key,val){ return idbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction(IDB_STORE,"readwrite"); tx.objectStore(IDB_STORE).put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); })); }
 
 async function loadDataAsync(){
+  /* ١) جرّب السحابة أولاً (Firestore) — التعديلات بتوصل لكل الأجهزة */
+  if(db){
+    try{
+      const snap=await Promise.race([
+        db.collection("site").doc("config").get(),
+        new Promise((_,rej)=>setTimeout(()=>rej(new Error("t")),6000))
+      ]);
+      if(snap.exists){
+        const remote=snap.data();
+        const d=normalizeData(JSON.parse(remote.json||"{}"));
+        try{ await idbSet(IDB_KEY,d); }catch(e){}
+        return d;
+      }
+    }catch(e){}
+  }
+  /* ٢) ما في سحابة/نت → آخر نسخة محفوظة محلياً */
   try{
     const fromIdb=await idbGet(IDB_KEY);
     if(fromIdb) return normalizeData(fromIdb);
-    // ترحيل تلقائي من النسخة القديمة (localStorage) لمرة واحدة
     const raw=localStorage.getItem(LS_KEY);
     if(raw){ const d=normalizeData(JSON.parse(raw)); try{ await idbSet(IDB_KEY,d); localStorage.removeItem(LS_KEY); }catch(e){} return d; }
   }catch(e){ return loadDataSyncFallback(); }
   return normalizeData(DEFAULT_DATA);
 }
-/* حفظ تفاؤلي: بيرجّع true فوراً وبيكتب بالخلفية على IndexedDB */
-function persist(){ idbSet(IDB_KEY, DATA).catch(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(DATA)); }catch(e){} }); }
+/* حفظ: محلي فوراً + دفع للسحابة إذا الأدمن مسجّل دخول */
+let cloudSaveTimer=null;
+function pushToCloud(){
+  if(!db||!auth||!auth.currentUser) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer=setTimeout(async ()=>{
+    try{
+      await db.collection("site").doc("config").set({ json:JSON.stringify(DATA), updatedAt:firebase.firestore.FieldValue.serverTimestamp(), by:auth.currentUser.email||"" });
+      cloudBadge(true);
+    }catch(e){ cloudBadge(false); }
+  }, 600);
+}
+function cloudBadge(ok){
+  try{
+    let b=document.getElementById("cloudBadge");
+    if(!b){ b=document.createElement("div"); b.id="cloudBadge"; b.style.cssText="position:fixed;bottom:14px;right:14px;z-index:9998;padding:7px 13px;border-radius:999px;font-size:12px;font-weight:800;font-family:inherit;box-shadow:0 6px 16px rgba(0,0,0,.25);transition:opacity .4s"; document.body.appendChild(b); }
+    b.style.background= ok?"#1F7A45":"#8F2A2A"; b.style.color="#fff";
+    b.textContent= ok?"☁️ اتحفظ للجميع":"⚠️ ما اتحفظ للسحابة — تحقق من النت";
+    b.style.opacity="1"; clearTimeout(b._t); b._t=setTimeout(()=>{ b.style.opacity="0"; }, ok?2200:5000);
+  }catch(e){}
+}
+function persist(){ idbSet(IDB_KEY, DATA).catch(()=>{ try{ localStorage.setItem(LS_KEY, JSON.stringify(DATA)); }catch(e){} }); pushToCloud(); }
 function saveData(){ persist(); return true; }
 function getPin(){ return localStorage.getItem(LS_PIN)||"1234"; }
 function setPin(p){ localStorage.setItem(LS_PIN,p); }
@@ -639,7 +676,9 @@ function drawIcon(size){
 function setupPWA(){
   try{
     document.getElementById("appleIcon").href=drawIcon(180);
-    const m={ name:(DATA.office.name||"مكتب المختار")+" — دليل المواطن", short_name:"دليل المواطن", start_url:".", scope:".", display:"standalone", background_color:"#F6F2E8", theme_color:"#15532E", dir:"rtl", lang:"ar", icons:[{src:drawIcon(192),sizes:"192x192",type:"image/png",purpose:"any"},{src:drawIcon(512),sizes:"512x512",type:"image/png",purpose:"any maskable"}] };
+    document.getElementById("favIcon").href=drawIcon(64);
+    const base=location.href.split("#")[0].split("?")[0];
+    const m={ name:(DATA.office.name||"مكتب المختار")+" — دليل المواطن", short_name:"دليل المواطن", start_url:base, scope:base.replace(/[^\/]*$/,""), display:"standalone", background_color:"#F6F2E8", theme_color:"#15532E", dir:"rtl", lang:"ar", icons:[{src:drawIcon(192),sizes:"192x192",type:"image/png",purpose:"any"},{src:drawIcon(512),sizes:"512x512",type:"image/png",purpose:"any maskable"}] };
     document.getElementById("manifestLink").href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:"application/manifest+json"}));
   }catch(e){}
 }
@@ -1189,11 +1228,26 @@ document.getElementById("resetBtn").addEventListener("click",()=>{ if(confirm("�
 /* ===== دخول/خروج وضع المختار (تسجيل دخول موحّد بحساب Firebase) ===== */
 function enterAdmin(){ document.body.classList.add("admin"); renderBoard(val("searchInput")); }
 function leaveAdmin(){ document.body.classList.remove("admin"); renderBoard(val("searchInput")); }
-document.getElementById("gearBtn").addEventListener("click",()=>{
+function requestAdmin(){
   if(document.body.classList.contains("admin")) return;
   if(auth&&auth.currentUser){ enterAdmin(); return; }
   openAdminLogin();
-});
+}
+document.getElementById("gearBtn").addEventListener("click",requestAdmin);
+/* الحركة السرية: ٥ كبسات سريعة على ختم الأرزة */
+(function(){
+  const seal=document.querySelector(".seal"); if(!seal) return;
+  let taps=0, timer=null;
+  seal.style.cursor="default";
+  seal.addEventListener("click",()=>{
+    taps++;
+    clearTimeout(timer); timer=setTimeout(()=>{ taps=0; },1600);
+    if(taps>=5){ taps=0; clearTimeout(timer); requestAdmin(); }
+  });
+})();
+/* أو فتح الرابط مع #admin */
+if(location.hash==="#admin"){ setTimeout(requestAdmin, 400); }
+window.addEventListener("hashchange",()=>{ if(location.hash==="#admin") requestAdmin(); });
 function openAdminLogin(afterLogin){
   setHead("👤","دخول المختار","سجّل دخول لإدارة الموقع والطلبات");
   if(!db||!auth){ shBody.innerHTML=`<div class="fb-badge off">● غير متصل</div><p style="color:var(--ink-soft)">الدخول بدّو إنترنت واتصال بقاعدة البيانات. تأكد إنك فاتح الموقع أونلاين وأعد المحاولة.</p>`; openSheet(); return; }
